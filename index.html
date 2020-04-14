@@ -6,14 +6,10 @@
   <meta http-equiv="content-type" content="text/html; charset=UTF-8"/>
   <script src="https://d3js.org/d3.v5.min.js"></script>
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
-  <script src='https://api.tiles.mapbox.com/mapbox-gl-js/v0.53.0/mapbox-gl.js'></script>
-  <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v0.53.0/mapbox-gl.css' rel='stylesheet' />
+  <script src='https://api.mapbox.com/mapbox-gl-js/v1.9.1/mapbox-gl.js'></script>
+  <link href='https://api.mapbox.com/mapbox-gl-js/v1.9.1/mapbox-gl.css' rel='stylesheet' />
   <script src='https://npmcdn.com/@turf/turf/turf.min.js'></script>
   <link href="https://fonts.googleapis.com/css2?family=Karla:wght@400;700&display=swap" rel="stylesheet">
-  <meta property="og:image" content="https://tobiaskauer.org/projects/end/preview.png" />
-  <meta property="og:image:type" content="image/png">
-  <meta property="og:image:width" content="1630">
-  <meta property="og:image:height" content="1646">
 </head>
 
 <style>
@@ -42,7 +38,10 @@
   <div id="desc">
     <h1>The end is near</h1>
     <h3>What syllables do german towns and villages end with?</h3>
-    <p><small>Code & Source: <a href="https://github.com/tobiaskauer/the-end-is-near">https://github.com/tobiaskauer/the-end-is-near</a></small></p>
+    <p>
+    <small>Original idea: <a href="https://github.com/tobiaskauer/the-end-is-near">https://github.com/tobiaskauer/the-end-is-near</a></small><br />
+    <small>Fork: <a href="https://github.com/jankolkmeier/the-end-is-near">https://github.com/jankolkmeier/the-end-is-near</a></small>
+    </p>
   </div>
   <div id="control">
     <form>
@@ -53,87 +52,67 @@
 
 <script>
 'use strict'
-
-var show = [
-  {key: "bach", color: "#EE1657"},
-  {key: "ach", color: "#FF90B1", break: true},
-  {key: "heim", color: "#A202F2", break: true},
-  {key: "weiler", color: "#136EEE"},
-  {key: "hofen", color: "#2D13EE"},
-  {key: "hoven", color: "#6A55FF", break: true},
-  {key: "stetten", color: "#2194A4"},
-  {key: "stedt", color: "#3AEBB4", break: true},
-  {key: "hausen", color: "#22A480"},
-  {key: "hagen", color: "#99FFDF", break: true},
-  {key: "rode", color: "#00F9FF"},
-  {key: "roda", color: "#00D7DC"},
-  {key: "rod", color: "#A7FDFF", break: true},
-  {key: "hain", color: "#B3D600"},
-  {key: "schütz", color: "#D2F619"},
-  {key: "grün", color: "#BDF619", break: true},
-  {key: "reuth", color: "#F67219"},
-  {key: "ing", color: "#F63019", break: true},
-  {key: "itz", color: "#E8D90D"},
-  {key: "ow", color: "#FFE600"}
   
-  //{key: "burg", color: "#EE1657", break: true},
-  //{key: "leben", color: "#A7FDFF", break: true},
-]
+var colors = {
+  "bach": "#EE1657",
+  "ach": "#FF90B1",
+  "heim": "#A202F2",
+  "weiler": "#136EEE",
+  "hofen": "#2D13EE",
+  "hoven": "#6A55FF",
+  "stetten": "#2194A4",
+  "stedt": "#3AEBB4",
+  "hausen": "#22A480",
+  "hagen": "#99FFDF",
+  "rode": "#00F9FF",
+  "roda": "#00D7DC",
+  "rod": "#A7FDFF",
+  "hain": "#B3D600",
+  "schütz": "#D2F619",
+  "grün": "#BDF619",
+  "reuth": "#F67219",
+  "ing": "#F63019",
+  "itz": "#E8D90D",
+  "ow": "#FFE600"
+};
 
-var endungen = [
-  "hausen", "felden", "leiten", "garten", "hammer", "kirchen", "stetten", "weiler", "schütz", "wangen", "wiesen", //6+
-  "mühle", "leben", "ingen", "hofen", "stein", "reuth", "bruch", "brunn", "hoven", "hagen", "walde", "stadt", "stedt", "hütte", //5
-  "dorf","bach","berg","heim","feld","thal","hain","chen", "roda", "ried", "burg", "rode", "ling", "grün", "born", //4
-  "hof", "ach", "rod", "itz", "ing", "ow", "au", "tal", "ede" //3-
-  ].map(x=>{
-  var obj = {key: x, data:[], order: show.findIndex(y=>y.key == x)}
-  return obj
-})
+var endungen = [];
+var show = [];
+var emap = {};
+var eidx = 0;
 
-var possibles = {}
 console.time()
-d3.csv('data.csv',d3.autoType).then(csv => {
+d3.csv('https://gist.githubusercontent.com/jankolkmeier/e3fddfd5bc44fa5e6074c7a8f1b4101f/raw/8336ba49fa7f1e492063991ad72750a5e03b6b7f/export.csv', d3.autoType).then(csv => {
   var rest = {key: "rest", data: []}
   csv.forEach((d,i)=> {
-    if (true) { //restrict i if necessary
-      var ortsteil = d.ORTSTEIL.split("(")[0].trim().toLowerCase().split(" ")[0]
-
-      var hasKnownEndung = false
-      for (var i=0; i < endungen.length; i++) {
-        if (ortsteil.endsWith(endungen[i].key)) {
-          endungen[i].data.push(d);
-          hasKnownEndung =true
-          break;
-        }
+    if (!emap.hasOwnProperty(d.syl)) {
+      emap[d.syl] = eidx;
+      show[emap[d.syl]] = {
+        key: d.syl,
+        color: colors[d.syl] || "#FFFFFF"
       }
-
-      if(!hasKnownEndung) {
-        rest.data.push(d)
-        var last5 = ortsteil.slice(Math.max(ortsteil.length - 5, 1))
-        if(possibles[last5] == null) {
-          possibles[last5] = [d]
-        } else {
-          possibles[last5].push(d)
-        }
-      }
+      endungen[emap[d.syl]] = { key: d.syl, data:[], order: show.findIndex(y=>y.key == d.syl)}
+      eidx = eidx+1;
     }
-  })
-
+    endungen[emap[d.syl]].data.push(d)
+  });
+  
   console.timeEnd()
-  //endungen = endungen.sort(((a,b)=>b.data.length - a.data.length))
-  //console.log(Object.entries(possibles).sort((a,b)=>b[1].length - a[1].length))
 
   showMap(
     endungen
       .filter(x=>x.order != -1)
       .sort((a,b)=>a.order - b.order)
     ,rest
-  )
+  );
+  
 });
 
 
+
+
 function showMap(endungen,rest) {
-  mapboxgl.accessToken = 'pk.eyJ1IjoidG9iaS12aWVyendvIiwiYSI6ImNqZThqOWN3NTA4aXEzM28zbWd1Y3BqejgifQ.N7atuEiZ1FJvayULe6BYmg';
+  mapboxgl.accessToken = 'pk.eyJ1IjoiamFua29sa21laWVyIiwiYSI6ImNrOTA2dnQycDAyanEzZ3IyN3RwY2ZoNGcifQ.kbYdQrL7L5ipf0xovTsO8Q';
   var map = new mapboxgl.Map({
     container: 'map',
     style: 'mapbox://styles/tobi-vierzwo/ck8yodl5v02h31iny9yyy7m47', 
@@ -185,7 +164,7 @@ function showMap(endungen,rest) {
     endungen.forEach(endung => {
       var geojson = turf.featureCollection(endung.data.map(x=>{
         //console.log(x.LON, x.LAT, x.ORTSTEIL) //easy peasy debugging
-        return turf.point([x.LON, x.LAT], {name: x.ORTSTEIL}) 
+        return turf.point([x.longitude, x.latitude], {name: x.name}) 
       }))
       map.addSource(endung.key, {
         'type': 'geojson',
